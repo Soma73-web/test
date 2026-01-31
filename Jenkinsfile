@@ -223,16 +223,25 @@ EOF
         }
       }
     }
+
+    stage('Cleanup Workspace') {
+      steps {
+        script {
+          echo "Running cleanup on workspace (ensures FilePath context)..."
+          sh '''
+            rm -f /tmp/*-key.pem || true
+            docker logout ${ACR_SERVER} || true
+          '''
+        }
+      }
+    }
   }
 
   post {
     always {
-      // Cleanup (run inside node to provide workspace/FilePath context)
-      node {
-        sh '''
-          rm -f /tmp/*-key.pem || true
-          docker logout ${ACR_SERVER} || true
-        '''
+      // Post-run note: cleanup handled in 'Cleanup Workspace' stage
+      script {
+        echo "Post: cleanup completed in 'Cleanup Workspace' stage"
       }
     }
 
