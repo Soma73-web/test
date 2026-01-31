@@ -8,20 +8,17 @@ pipeline {
   }
 
   environment {
-    // Azure Container Registry
-    ACR = credentials('acr-registry')
-    ACR_SERVER = "${ACR_USR}.azurecr.io"
-    
-    // Frontend Server 1 (Azure VM)
-    FRONTEND_SERVER = credentials('frontend-server')
-    FRONTEND_HOST = "${FRONTEND_SERVER_USR}"
-    FRONTEND_USER = "${FRONTEND_SERVER_PSW}"
-    
+    // Azure Container Registry (set this in Jenkins global env or replace here)
+    ACR_REGISTRY = "myacr.azurecr.io"
+
+    // Frontend Server 1 (Azure VM) - set these as job/global env vars
+    FRONTEND_HOST = ""
+    FRONTEND_USER = "azureuser"
+
     // Backend Server 2 (Azure VM)
-    BACKEND_SERVER = credentials('backend-server')
-    BACKEND_HOST = "${BACKEND_SERVER_USR}"
-    BACKEND_USER = "${BACKEND_SERVER_PSW}"
-    
+    BACKEND_HOST = ""
+    BACKEND_USER = "azureuser"
+
     // Image Names
     BACKEND_IMAGE = "neet-backend"
     FRONTEND_IMAGE = "neet-frontend"
@@ -48,7 +45,7 @@ pipeline {
           withCredentials([usernamePassword(credentialsId: 'acr-creds', usernameVariable: 'ACR_USER', passwordVariable: 'ACR_PASS')]) {
             sh '''
               echo "Logging into Azure Container Registry..."
-              docker login ${ACR_SERVER} -u ${ACR_USER} -p ${ACR_PASS}
+              docker login ${ACR_REGISTRY} -u ${ACR_USER} -p ${ACR_PASS}
               echo "✓ ACR login successful"
             '''
           }
@@ -62,8 +59,8 @@ pipeline {
           echo "Building backend Docker image..."
           sh '''
             cd backend
-            docker build -t ${ACR_SERVER}/${BACKEND_IMAGE}:${BUILD_TAG} \
-              -t ${ACR_SERVER}/${BACKEND_IMAGE}:${TAG} \
+            docker build -t ${ACR_REGISTRY}/${BACKEND_IMAGE}:${BUILD_TAG} \
+              -t ${ACR_REGISTRY}/${BACKEND_IMAGE}:${TAG} \
               -f Dockerfile .
             echo "✓ Backend image built successfully"
           '''
@@ -77,8 +74,8 @@ pipeline {
           echo "Building frontend Docker image..."
           sh '''
             cd client
-            docker build -t ${ACR_SERVER}/${FRONTEND_IMAGE}:${BUILD_TAG} \
-              -t ${ACR_SERVER}/${FRONTEND_IMAGE}:${TAG} \
+            docker build -t ${ACR_REGISTRY}/${FRONTEND_IMAGE}:${BUILD_TAG} \
+              -t ${ACR_REGISTRY}/${FRONTEND_IMAGE}:${TAG} \
               --build-arg REACT_APP_API_BASE_URL=${REACT_APP_API_BASE_URL} \
               -f Dockerfile .
             echo "✓ Frontend image built successfully"
@@ -92,10 +89,10 @@ pipeline {
         script {
           echo "Pushing images to Azure Container Registry..."
           sh '''
-            docker push ${ACR_SERVER}/${BACKEND_IMAGE}:${BUILD_TAG}
-            docker push ${ACR_SERVER}/${BACKEND_IMAGE}:${TAG}
-            docker push ${ACR_SERVER}/${FRONTEND_IMAGE}:${BUILD_TAG}
-            docker push ${ACR_SERVER}/${FRONTEND_IMAGE}:${TAG}
+            docker push ${ACR_REGISTRY}/${BACKEND_IMAGE}:${BUILD_TAG}
+            docker push ${ACR_REGISTRY}/${BACKEND_IMAGE}:${TAG}
+            docker push ${ACR_REGISTRY}/${FRONTEND_IMAGE}:${BUILD_TAG}
+            docker push ${ACR_REGISTRY}/${FRONTEND_IMAGE}:${TAG}
             echo "✓ Images pushed to ACR successfully"
           '''
         }
@@ -117,10 +114,10 @@ pipeline {
               ssh -i /tmp/frontend-key.pem -o StrictHostKeyChecking=no ${FRONTEND_USER}@${FRONTEND_HOST} << 'EOF'
               
               # Login to ACR
-              docker login ${ACR_SERVER} -u ${ACR_USER} -p ${ACR_PASS}
+              docker login ${ACR_REGISTRY} -u ${ACR_USER} -p ${ACR_PASS}
               
               # Pull latest frontend image
-              docker pull ${ACR_SERVER}/${FRONTEND_IMAGE}:${TAG}
+              docker pull ${ACR_REGISTRY}/${FRONTEND_IMAGE}:${TAG}
               
               # Stop and remove old container
               docker stop neet-frontend-app || true
@@ -132,7 +129,7 @@ pipeline {
                 -p 80:3000 \
                 -p 443:3000 \
                 --restart unless-stopped \
-                ${ACR_SERVER}/${FRONTEND_IMAGE}:${TAG}
+                ${ACR_REGISTRY}/${FRONTEND_IMAGE}:${TAG}
               
               echo "✓ Frontend deployed successfully"
               docker ps --filter "name=neet-frontend-app"
@@ -161,10 +158,10 @@ EOF
               ssh -i /tmp/backend-key.pem -o StrictHostKeyChecking=no ${BACKEND_USER}@${BACKEND_HOST} << 'EOF'
               
               # Login to ACR
-              docker login ${ACR_SERVER} -u ${ACR_USER} -p ${ACR_PASS}
+              docker login ${ACR_REGISTRY} -u ${ACR_USER} -p ${ACR_PASS}
               
               # Pull latest backend image
-              docker pull ${ACR_SERVER}/${BACKEND_IMAGE}:${TAG}
+              docker pull ${ACR_REGISTRY}/${BACKEND_IMAGE}:${TAG}
               
               # Navigate to project directory
               cd /opt/neet-academy
