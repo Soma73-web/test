@@ -227,11 +227,13 @@ EOF
 
   post {
     always {
-      // Cleanup
-      sh '''
-        rm -f /tmp/*-key.pem
-        docker logout ${ACR_SERVER} || true
-      '''
+      // Cleanup (run inside node to provide workspace/FilePath context)
+      node {
+        sh '''
+          rm -f /tmp/*-key.pem || true
+          docker logout ${ACR_SERVER} || true
+        '''
+      }
     }
 
     success {
