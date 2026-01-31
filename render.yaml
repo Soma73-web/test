@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: neet-academy-backend
+    env: node
+    plan: free
+        buildCommand: cd backend && chmod +x build.sh && ./build.sh
+    startCommand: cd backend && npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        fromService:
+          type: web
+          name: neet-academy-backend
+          property: port
+    healthCheckPath: /health
